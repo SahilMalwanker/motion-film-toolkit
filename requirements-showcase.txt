@@ -1,0 +1,3 @@
+# Optional: rebuild the public README images and animated preview.
+# Not required to preview or render films.
+Pillow>=10.4,<13

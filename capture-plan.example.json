@@ -1,0 +1,58 @@
+{
+  "baseUrl": "http://localhost:3000",
+  "width": 1920,
+  "height": 1080,
+  "scale": 2,
+  "colorScheme": "dark",
+  "screens": [
+    {
+      "name": "home",
+      "path": "/",
+      "boxes": {
+        "summary": { "text": "Summary", "card": true },
+        "trends": { "selector": "#trends" },
+        "logo": { "rect": [24, 18, 160, 40] }
+      }
+    },
+    {
+      "name": "compose",
+      "path": "/requests/new",
+      "boxes": {
+        "field": { "selector": "input[name=title]" },
+        "send": { "text": "Submit", "exact": true }
+      }
+    },
+    {
+      "name": "compose-done",
+      "path": "/requests/new",
+      "actions": [
+        { "fill": ["input[name=title]", "Onboarding checklist for new hires"] },
+        { "click": "button[type=submit]" },
+        { "waitFor": "[role=status]" }
+      ],
+      "boxes": {
+        "toast": { "selector": "[role=status]" }
+      }
+    },
+    {
+      "name": "pricing",
+      "path": "/pricing",
+      "fullPage": true,
+      "boxes": {
+        "plans": { "text": "Compare plans", "card": true }
+      }
+    },
+    {
+      "name": "phone-home",
+      "path": "/",
+      "width": 390,
+      "height": 844,
+      "scale": 3,
+      "mobile": true,
+      "radius": 44,
+      "boxes": {
+        "menu": { "selector": "nav button" }
+      }
+    }
+  ]
+}

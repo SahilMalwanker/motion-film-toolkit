@@ -1,0 +1,34 @@
+# Rendered output and screens stay local; keep the empty folders.
+# Remove the film/shots lines if you want to version your own screens.
+film/out/*
+!film/out/.gitkeep
+film/shots/*
+!film/shots/.gitkeep
+
+# Capture plans may name private URLs; sign-in state holds session cookies.
+capture-plan*.json
+!capture-plan.example.json
+storage-state*.json
+*.storage.json
+film/brief.md
+
+# Environment files and private keys must never be published.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Editors and operating systems
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

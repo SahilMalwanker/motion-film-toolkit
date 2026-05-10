@@ -1,0 +1,11 @@
+# Making and rendering films needs no third-party Python packages.
+# server.py and tools/run.py, add_screen.py and inspect_mp4.py use only the Python standard library
+# (Python 3.9 or newer).
+#
+# Everything else runs in the browser: Chrome or Edge with WebCodecs H.264 and AAC encoders, WebGL2 in
+# OffscreenCanvas, and the canvas features ctx.filter and ctx.letterSpacing. See docs/rendering.md.
+#
+# Optional extras:
+#   Capturing a running web app:  python -m pip install -r requirements-capture.txt
+#   Rebuilding public README graphics:  python -m pip install -r requirements-showcase.txt
+#   Checking an MP4 with the Windows media stack:  tools/check_media.ps1 (Windows PowerShell, .NET WPF)

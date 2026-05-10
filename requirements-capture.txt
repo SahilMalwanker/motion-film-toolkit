@@ -1,0 +1,4 @@
+# Only for tools/capture.py, which captures a running web app's screens and boxes.
+# After installing, download its browser once:  python -m playwright install chromium
+# (or skip that and drive an installed browser with --channel chrome or --channel msedge).
+playwright>=1.40

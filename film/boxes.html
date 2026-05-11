@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Box editor</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0b0d12; color: #cbd5e1; font: 13px "Segoe UI", system-ui, sans-serif; }
+  header { display: flex; gap: 10px; align-items: center; padding: 8px 12px; background: #11151d; border-bottom: 1px solid #222a36; position: sticky; top: 0; z-index: 1; }
+  select, button { font: inherit; color: #e2e8f0; background: #1a2130; border: 1px solid #2a3446; border-radius: 6px; padding: 5px 10px; }
+  button { cursor: pointer; }
+  #help { color: #8391a7; }
+  #info { margin-left: auto; font-variant-numeric: tabular-nums; }
+  main { padding: 16px; }
+  canvas { display: block; cursor: crosshair; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
+</style>
+</head>
+<body>
+<header>
+  <select id="screen" aria-label="Screen"></select>
+  <button id="save">Save boxes</button>
+  <button id="copy">Copy JSON</button>
+  <span id="help">Drag to draw a box and name it, even inside another. Click a box to select it, again for the box around it. Drag the selected box or its corner to move or resize it. Arrows nudge (Shift: 10 px), Enter renames, Delete removes, Esc deselects.</span>
+  <span id="info"></span>
+</header>
+<main><canvas id="view"></canvas></main>
+<script type="module">
+  // Mark named boxes on any screenshot in film/shots/ and save them into its manifest (name.json).
+  // Add screenshots first with: python tools/add_screen.py path/to/image.png --name home
+  const $ = id => document.getElementById(id);
+  const view = $('view'), g = view.getContext('2d');
+  const NAME = /^[A-Za-z][\w-]{0,40}$/;
+  let manifest = null, image = null, k = 1, selected = null, drag = null;
+
+  const info = text => { $('info').textContent = text; };
+  const toLayout = event => {
+    const r = view.getBoundingClientRect();
+    return [(event.clientX - r.left) / k, (event.clientY - r.top) / k];
+  };
+  const hits = ([x, y]) => Object.keys(manifest.boxes).filter(key => {
+    const [bx, by, bw, bh] = manifest.boxes[key];
+    return x >= bx && x <= bx + bw && y >= by && y <= by + bh;
+  }).sort((a, b) => manifest.boxes[a][2] * manifest.boxes[a][3] - manifest.boxes[b][2] * manifest.boxes[b][3]);
+  const corner = ([x, y], key) => {
+    const [bx, by, bw, bh] = manifest.boxes[key];
+    return Math.abs(x - (bx + bw)) * k < 10 && Math.abs(y - (by + bh)) * k < 10;
+  };
+
+  async function screens() {
+    const listing = await (await fetch('shots/')).text();
+    return [...listing.matchAll(/href="([^"?/]+)\.json"/g)].map(m => decodeURIComponent(m[1])).sort();
+  }
+
+  async function load(name) {
+    manifest = await (await fetch(`shots/${name}.json`)).json();
+    manifest.boxes = manifest.boxes || {};
+    const blob = await (await fetch(`shots/${manifest.image || `${name}.png`}`)).blob();
+    image = await createImageBitmap(blob);
+    const scale = manifest.scale || 2;
+    manifest.width = manifest.width || image.width / scale;
+    manifest.height = manifest.height || image.height / scale;
+    k = Math.min(1, (innerWidth - 40) / manifest.width);
+    view.width = Math.round(manifest.width * k);
+    view.height = Math.round(manifest.height * k);
+    selected = null;
+    draw();
+  }
+
+  function draw() {
+    g.clearRect(0, 0, view.width, view.height);
+    g.drawImage(image, 0, 0, view.width, view.height);
+    g.font = '600 12px "Segoe UI", system-ui, sans-serif';
+    for (const [key, [x, y, w, h]] of Object.entries(manifest.boxes)) {
+      const on = key === selected;
+      g.strokeStyle = on ? '#FBBF24' : '#60A5FA';
+      g.lineWidth = on ? 2.5 : 1.5;
+      g.strokeRect(x * k, y * k, w * k, h * k);
+      const tw = g.measureText(key).width + 8;
+      g.fillStyle = on ? '#FBBF24' : '#60A5FA';
+      g.fillRect(x * k, Math.max(0, y * k - 17), tw, 17);
+      g.fillStyle = '#0b0d12';
+      g.fillText(key, x * k + 4, Math.max(0, y * k - 17) + 13);
+      if (on) g.fillRect((x + w) * k - 4, (y + h) * k - 4, 8, 8);
+    }
+    if (drag && drag.mode === 'new' && drag.moved) {
+      g.setLineDash([6, 4]);
+      g.strokeStyle = '#FBBF24';
+      g.strokeRect(...drag.rect.map(v => v * k));
+      g.setLineDash([]);
+    }
+    const b = selected && manifest.boxes[selected];
+    info(b ? `${selected}: [${b.join(', ')}] layout px` : `${manifest.name || $('screen').value}: ${manifest.width}x${manifest.height} layout px, ${Object.keys(manifest.boxes).length} boxes`);
+  }
+
+  function askName(suggested) {
+    for (;;) {
+      const name = prompt('Box name (letters, digits, - and _):', suggested || '');
+      if (name === null) return null;
+      if (NAME.test(name) && (name === suggested || !manifest.boxes[name])) return name;
+      alert(manifest.boxes[name] ? `There is already a box "${name}".` : 'Use a letter first, then letters, digits, - or _.');
+    }
+  }
+
+  // A drag draws a new box unless it starts on the selected one; a click cycles through the boxes under the pointer, smallest first.
+  view.addEventListener('mousedown', event => {
+    if (!manifest || event.button !== 0) return;
+    const p = toLayout(event);
+    const mode = selected && corner(p, selected) ? 'size' : selected && hits(p).includes(selected) ? 'move' : 'new';
+    drag = { mode, key: selected, from: p, start: selected && [...manifest.boxes[selected]], rect: [p[0], p[1], 0, 0], moved: false };
+  });
+  addEventListener('mousemove', event => {
+    if (!drag) return;
+    const [x, y] = toLayout(event), [fx, fy] = drag.from;
+    drag.moved = drag.moved || Math.hypot(x - fx, y - fy) * k > 3;
+    if (!drag.moved) return;
+    if (drag.mode === 'new') drag.rect = [Math.min(x, fx), Math.min(y, fy), Math.abs(x - fx), Math.abs(y - fy)];
+    else if (drag.mode === 'move') manifest.boxes[drag.key] = [drag.start[0] + x - fx, drag.start[1] + y - fy, drag.start[2], drag.start[3]].map(Math.round);
+    else manifest.boxes[drag.key] = [drag.start[0], drag.start[1], Math.max(4, drag.start[2] + x - fx), Math.max(4, drag.start[3] + y - fy)].map(Math.round);
+    draw();
+  });
+  addEventListener('mouseup', () => {
+    if (!drag) return;
+    if (!drag.moved) {
+      const under = hits(drag.from);
+      selected = under.length ? under[(under.indexOf(selected) + 1) % under.length] : null;
+    } else if (drag.mode === 'new' && drag.rect[2] * k > 6 && drag.rect[3] * k > 6) {
+      const name = askName('');
+      if (name) { manifest.boxes[name] = drag.rect.map(Math.round); selected = name; }
+    }
+    drag = null;
+    draw();
+  });
+  addEventListener('keydown', event => {
+    if (!selected) return;
+    const b = manifest.boxes[selected];
+    const step = event.shiftKey ? 10 : 1;
+    const moves = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
+    if (moves[event.code]) {
+      event.preventDefault();
+      b[0] += moves[event.code][0];
+      b[1] += moves[event.code][1];
+    } else if (event.code === 'Delete' || event.code === 'Backspace') {
+      delete manifest.boxes[selected];
+      selected = null;
+    } else if (event.code === 'Enter') {
+      const name = askName(selected);
+      if (name && name !== selected) { manifest.boxes[name] = b; delete manifest.boxes[selected]; selected = name; }
+    } else if (event.code === 'Escape') {
+      selected = null;
+    } else return;
+    draw();
+  });
+
+  $('save').addEventListener('click', async () => {
+    const name = $('screen').value;
+    const response = await fetch(`/save/shots/${name}.json`, { method: 'POST', body: JSON.stringify(manifest, null, 2) });
+    info(response.ok ? `saved film/shots/${name}.json` : `save failed: ${response.status} (is server.py running?)`);
+  });
+  $('copy').addEventListener('click', async () => {
+    await navigator.clipboard.writeText(JSON.stringify(manifest.boxes, null, 2));
+    info('boxes copied');
+  });
+  $('screen').addEventListener('change', () => load($('screen').value));
+
+  const names = await screens();
+  if (!names.length) info('No screens in film/shots/ yet. Add one with: python tools/add_screen.py image.png --name home');
+  for (const name of names) $('screen').append(new Option(name, name));
+  const wanted = new URLSearchParams(location.search).get('screen');
+  if (wanted && names.includes(wanted)) $('screen').value = wanted;
+  if (names.length) await load($('screen').value);
+</script>
+</body>
+</html>

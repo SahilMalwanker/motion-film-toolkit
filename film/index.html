@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Motion film</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; font: 13px "Segoe UI", system-ui, sans-serif; color: #94a3b8; }
+  canvas { position: absolute; inset: 0 0 44px 0; margin: auto; width: 100vw; max-width: 100vw; max-height: calc(100vh - 44px); aspect-ratio: 16 / 9; }
+  #bar { position: fixed; left: 0; right: 0; bottom: 0; height: 44px; display: flex; gap: 8px; align-items: center; padding: 0 10px; background: #0b1220; border-top: 1px solid #1f2a3c; }
+  #bar button { font: inherit; color: #e2e8f0; background: #172133; border: 1px solid #243044; border-radius: 6px; padding: 5px 12px; cursor: pointer; }
+  #bar button:disabled { opacity: 0.5; cursor: default; }
+  #scrub { flex: 1; }
+  #time { min-width: 76px; text-align: right; font-variant-numeric: tabular-nums; }
+  #beat { min-width: 180px; max-width: 320px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: #cbd5e1; }
+  body.bare #bar { display: none; }
+  body.bare canvas { inset: 0; max-height: 100vh; }
+</style>
+<script>
+  // Errors from the very start, including modules that fail to load, go into the automation report.
+  window.__filmErrors = [];
+  addEventListener('error', e => window.__filmErrors.push(`${e.message}${e.filename ? ` (${e.filename.split('/').slice(-2).join('/').replace(/\?.*$/, '')}:${e.lineno}:${e.colno})` : ''}`));
+  addEventListener('unhandledrejection', e => window.__filmErrors.push(String((e.reason && (e.reason.stack || e.reason.message)) || e.reason)));
+</script>
+</head>
+<body>
+<canvas id="stage" width="1920" height="1080"></canvas>
+<div id="bar">
+  <button id="play" disabled>Play</button>
+  <input id="scrub" type="range" min="0" max="1" step="0.01" value="0" disabled aria-label="Film time">
+  <span id="time">0.00 s</span>
+  <span id="beat"></span>
+  <button id="stills" disabled>Stills</button>
+  <button id="sheet" disabled>Contact sheet</button>
+  <button id="render" disabled>Render MP4</button>
+  <span id="status">loading…</span>
+</div>
+<script type="module">
+  // ?story=examples/demo.js picks the storyboard (default: storyboard.js).
+  // ?run=check|stills|sheet|proof|render performs one action and writes out/report.json (tools/run.py).
+  // ?bare hides this bar. Space plays and stops; arrow keys step one frame, or one second with Shift.
+  const $ = id => document.getElementById(id);
+  const params = new URLSearchParams(location.search);
+  const story = params.get('story') || 'storyboard.js';
+  const status = text => { $('status').textContent = text; };
+  if (params.has('bare')) document.body.classList.add('bare');
+
+  // Load the story again as a module script: the browser then reports the file and line of a syntax error.
+  const locate = path => new Promise(resolve => {
+    const script = document.createElement('script');
+    script.type = 'module';
+    script.src = `./${path}?locate=${Date.now()}`;
+    script.onload = script.onerror = () => setTimeout(resolve, 100);
+    document.head.appendChild(script);
+  });
+
+  let film = null, failure = null;
+  try {
+    if (!/^[\w-]+(\/[\w-]+)*\.js$/.test(story)) throw new Error('?story= must name a .js file inside film/, such as examples/demo.js');
+    const { start } = await import('./lib/kit.js');
+    const module = await import(`./${story}`);
+    film = await start(module.default);
+    window.film = film;
+  } catch (error) {
+    failure = error;
+    if (error instanceof SyntaxError) await locate(story);
+    status(`error: ${error.message.split('\n')[0]}`);
+    console.error(error);
+  }
+
+  if (params.has('run')) {
+    try {
+      const { automate } = await import('./lib/runner.js');
+      const report = await automate(film, failure, params);
+      status(`${report.action}: ${report.ok ? 'done' : 'failed'} · see out/report.json`);
+      if (params.has('close')) setTimeout(() => window.close(), 800);
+    } catch (error) {
+      // The runner itself could not load: write a minimal report directly.
+      const report = { action: params.get('run'), token: params.get('token'), done: true, ok: false, errors: [String(error.stack || error), ...window.__filmErrors] };
+      await fetch('/save/out/report.json', { method: 'POST', body: JSON.stringify(report, null, 2) });
+    }
+  } else if (film) {
+    wire(film);
+  }
+
+  function wire(film) {
+    let playing = false;
+    const controls = ['play', 'scrub', 'stills', 'sheet', 'render'];
+    const busy = on => controls.forEach(id => { $(id).disabled = on; });
+    const ready = () => status(`ready · ${film.duration.toFixed(1)} s · ${film.timeline.length} beats${film.warnings.length ? ` · ${film.warnings.length} warning(s) in the console` : ''}`);
+    const show = t => {
+      $('time').textContent = `${t.toFixed(2)} s`;
+      $('scrub').value = t;
+      const beat = film.beatAt(t);
+      $('beat').textContent = `${beat.index} · ${beat.label}`;
+    };
+    film.warnings.forEach(w => console.warn(w));
+
+    function seek(t) {
+      const clamped = Math.min(film.duration, Math.max(0, t));
+      film.renderFrame(clamped);
+      show(clamped);
+    }
+    async function toggle() {
+      if (playing) {
+        film.stop();
+        playing = false;
+        $('play').textContent = 'Play';
+        return;
+      }
+      const at = Number($('scrub').value);
+      playing = true;
+      $('play').textContent = 'Stop';
+      status('preparing sound…');
+      await film.play(at >= film.duration - 0.05 ? 0 : at, t => {
+        show(t);
+        if (t >= film.duration) { playing = false; $('play').textContent = 'Play'; }
+      });
+      ready();
+    }
+    async function act(run, label) {
+      if (playing) await toggle();
+      busy(true);
+      status(`${label}…`);
+      try {
+        const { automate } = await import('./lib/runner.js');
+        const report = await automate(film, null, new URLSearchParams({ run, story }));
+        status(report.ok ? `saved ${report.files.length} file(s) to film/out/` : `${label} failed: ${report.errors[0]}`);
+      } catch (error) {
+        status(`${label} failed: ${error.message}`);
+        console.error(error);
+      }
+      busy(false);
+    }
+
+    $('scrub').max = film.duration;
+    busy(false);
+    show(0);
+    ready();
+    $('play').addEventListener('click', toggle);
+    $('scrub').addEventListener('input', () => {
+      if (playing) toggle();
+      seek(Number($('scrub').value));
+    });
+    $('stills').addEventListener('click', () => act('stills', 'saving stills'));
+    $('sheet').addEventListener('click', () => act('sheet', 'making contact sheets'));
+    $('render').addEventListener('click', async () => {
+      if (playing) await toggle();
+      busy(true);
+      const started = performance.now();
+      try {
+        const result = await film.renderVideo({ onProgress: t => status(`rendering ${t.toFixed(0)} of ${film.duration.toFixed(0)} s`) });
+        status(`saved ${result.file} · ${(result.bytes / 1048576).toFixed(1)} MB · ${result.frames} frames in ${Math.round((performance.now() - started) / 1000)} s${result.audio ? '' : ' · no AAC encoder, sound saved as WAV'}`);
+      } catch (error) {
+        status(`render failed: ${error.message}`);
+        console.error(error);
+      }
+      busy(false);
+    });
+    addEventListener('keydown', event => {
+      if (event.target.tagName === 'BUTTON' || $('render').disabled) return;
+      if (event.code === 'Space') { event.preventDefault(); toggle(); }
+      const step = event.shiftKey ? 1 : 1 / 60;
+      if (event.code === 'ArrowRight' || event.code === 'ArrowLeft') {
+        event.preventDefault();
+        if (playing) toggle();
+        seek(Number($('scrub').value) + (event.code === 'ArrowRight' ? step : -step));
+      }
+    });
+  }
+</script>
+</body>
+</html>

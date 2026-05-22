@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 200" role="img" aria-labelledby="title">
+<title id="title">Workflow: bring your screens, direct the beats, review the frames, render the film.</title>
+<rect width="1600" height="200" rx="22" fill="#0A0E18"/>
+<g font-family="Segoe UI,Arial,sans-serif"><g transform="translate(24 24)"><rect width="370" height="152" rx="18" fill="#141A29" stroke="#2A3349"/>
+<text x="24" y="37" fill="#AF9FFF" font-size="15" font-weight="700" letter-spacing="2">01</text>
+<text x="24" y="78" fill="#F0F3FC" font-size="24" font-weight="650">Bring your screens</text>
+<text x="24" y="111" fill="#A8B4CC" font-size="15">Screenshots, captures or placeholders</text></g><g transform="translate(418 24)"><rect width="370" height="152" rx="18" fill="#141A29" stroke="#2A3349"/>
+<text x="24" y="37" fill="#AF9FFF" font-size="15" font-weight="700" letter-spacing="2">02</text>
+<text x="24" y="78" fill="#F0F3FC" font-size="24" font-weight="650">Direct the beats</text>
+<text x="24" y="111" fill="#A8B4CC" font-size="15">Camera, captions and interactions</text></g><g transform="translate(812 24)"><rect width="370" height="152" rx="18" fill="#141A29" stroke="#2A3349"/>
+<text x="24" y="37" fill="#AF9FFF" font-size="15" font-weight="700" letter-spacing="2">03</text>
+<text x="24" y="78" fill="#F0F3FC" font-size="24" font-weight="650">Review the frames</text>
+<text x="24" y="111" fill="#A8B4CC" font-size="15">Check, contact sheets and box proofs</text></g><g transform="translate(1206 24)"><rect width="370" height="152" rx="18" fill="#141A29" stroke="#2A3349"/>
+<text x="24" y="37" fill="#AF9FFF" font-size="15" font-weight="700" letter-spacing="2">04</text>
+<text x="24" y="78" fill="#F0F3FC" font-size="24" font-weight="650">Render the film</text>
+<text x="24" y="111" fill="#A8B4CC" font-size="15">MP4 and a generated soundtrack</text></g></g></svg>

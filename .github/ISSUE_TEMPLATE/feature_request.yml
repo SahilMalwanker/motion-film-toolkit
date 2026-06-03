@@ -1,0 +1,23 @@
+name: Feature request
+description: Suggest a reusable improvement for directing or rendering films.
+title: "[Idea]: "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is difficult today?
+      description: Describe a real directing, review or rendering task.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed improvement
+      description: Explain how it would work across different apps and brands.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives or examples
+      description: Existing techniques, a synthetic example, or an asset you have permission to share.

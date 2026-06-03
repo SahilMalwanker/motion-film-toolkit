@@ -1,0 +1,47 @@
+name: Bug report
+description: Report a reproducible issue with preview, screens, review or export.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: "Use synthetic data. Do not attach private screenshots, credentials, capture plans or browser session state. See SECURITY.md for security reports."
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - Preview or playback
+        - Screenshot import or box editor
+        - Storyboard or effects
+        - Contact sheets or checks
+        - MP4 or soundtrack export
+        - Optional web capture
+        - Documentation or project page
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: Prefer the bundled demo or a small synthetic storyboard.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual result
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system, browser/version and Python version.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Redacted error or report
+      description: Remove usernames, paths, private URLs and tokens before sharing.
+      render: text
